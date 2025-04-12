@@ -11,3 +11,13 @@ def format_date_g1(date_str):
 def format_date_folha(date_str):
     return date_str.replace("/", "%2F") 
 
+def estadao_date_to_iso(data_hora_str):
+    data_str, hora_str = data_hora_str.split(" | ")
+    
+    dia, mes, ano = map(int, data_str.split("/"))
+    
+    hora, minuto = map(int, hora_str.replace("h", ":").split(":"))
+    
+    data_hora = datetime(ano, mes, dia, hora, minuto)
+    
+    return data_hora.isoformat()

@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
-from iso_to_urldate import format_date_folha
+from utils import format_date_folha
 
-def get_news_from_scrap(search_str, start, end, next_page_link=None):
+def get_links(search_str, start, end, next_page_link=None):
     if next_page_link:
         page = requests.get(next_page_link)
     elif search_str and start and end:
@@ -31,7 +31,7 @@ def get_news_from_scrap(search_str, start, end, next_page_link=None):
     elif len(pagination_arrow) > 1: next_page = pagination_arrow[1]['href']
      
     if next_page:
-        next_list = get_news_from_scrap('','','',next_page_link=next_page)
+        next_list = get_links('','','',next_page_link=next_page)
         
         return links_list + next_list
     
@@ -55,7 +55,7 @@ def scrap(link):
     return {"paragraphs": '\n'.join(paragraph_list), "url": link, "pubDate": time}
 
 if __name__ == "__main__":
-    links = get_news_from_scrap('fiscal', '01/04/2025', '11/04/2025')
+    links = get_links('fiscal', '01/04/2025', '11/04/2025')
 
     news_list = []
     for link in links:
