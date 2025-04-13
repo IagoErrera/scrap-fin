@@ -8,8 +8,8 @@ class FolhaSpider(scrapy.Spider):
     # allowed_domains = ["search.folha.uol.com.br"]
 
     search_str = 'fiscal'
-    start_date ='8/04/2025'
-    end_date = '11/04/2025'
+    start_date = '01/01/2024'
+    end_date = '01/01/2025'
     page = 1
 
     def format_date(self, date_str):
