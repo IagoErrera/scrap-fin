@@ -9,11 +9,11 @@ from fin_web_scrap.items import NewsItem
 from datetime import datetime
 import math
 
-from transformers import (
-    AutoTokenizer,
-    BertForSequenceClassification,
-    pipeline,
-)
+# from transformers import (
+#     AutoTokenizer,
+#     BertForSequenceClassification,
+#     pipeline,
+# )
 
 class EstadaoSpider(scrapy.Spider):
     name = "estadao"
@@ -22,9 +22,6 @@ class EstadaoSpider(scrapy.Spider):
     # Query params
     size = 100
     off = 0
-    search_str = 'fiscal'
-    start_date = '01/01/2010'
-    end_date = '13/04/2025'
     base_url = 'https://www.estadao.com.br'
 
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
@@ -33,9 +30,9 @@ class EstadaoSpider(scrapy.Spider):
         if end_date: self.end_date = end_date  
         if search_str: self.search_str = search_str  
 
-        self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        self.finbert_pt_br_model = BertForSequenceClassification.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        self.finbert_pt_br_pipeline = pipeline(task='text-classification', model=self.finbert_pt_br_model, tokenizer=self.finbert_pt_br_tokenizer)
+        # self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
+        # self.finbert_pt_br_model = BertForSequenceClassification.from_pretrained("lucas-leme/FinBERT-PT-BR")
+        # self.finbert_pt_br_pipeline = pipeline(task='text-classification', model=self.finbert_pt_br_model, tokenizer=self.finbert_pt_br_tokenizer)
 
     # Auxiliar methods
     def format_date(self, date_time_str):
@@ -78,35 +75,35 @@ class EstadaoSpider(scrapy.Spider):
             response = failure.value.response
             self.logger.error("HttpError on %s", response.url)
 
-    def get_chuncks(self, text, max_tokens=400, overlap=50):
-        tokens = self.finbert_pt_br_tokenizer.tokenize(text)
-        chunks = []
+    # def get_chuncks(self, text, max_tokens=400, overlap=50):
+    #     tokens = self.finbert_pt_br_tokenizer.tokenize(text)
+    #     chunks = []
 
-        start = 0
-        while start < len(tokens):
-            end = start + max_tokens
-            chunk = tokens[start:end]
-            chunks.append(self.finbert_pt_br_tokenizer.convert_tokens_to_string(chunk))
-            start = end - overlap
+    #     start = 0
+    #     while start < len(tokens):
+    #         end = start + max_tokens
+    #         chunk = tokens[start:end]
+    #         chunks.append(self.finbert_pt_br_tokenizer.convert_tokens_to_string(chunk))
+    #         start = end - overlap
 
-        return chunks
+    #     return chunks
 
-    def get_index(self, text):
-        chunks = self.get_chuncks(text)
+    # def get_index(self, text):
+    #     chunks = self.get_chuncks(text)
         
-        pred = self.finbert_pt_br_pipeline(chunks)
+    #     pred = self.finbert_pt_br_pipeline(chunks)
 
-        positive = 0
-        negative = 0
-        neutral = 0
-        for p in pred:
-            if p['label'] == "POSITIVE": positive += 1
-            elif p['label'] == "NEGATIVE": negative += 1
-            else: neutral += 1
+    #     positive = 0
+    #     negative = 0
+    #     neutral = 0
+    #     for p in pred:
+    #         if p['label'] == "POSITIVE": positive += 1
+    #         elif p['label'] == "NEGATIVE": negative += 1
+    #         else: neutral += 1
         
-        if positive > negative: return 1
-        elif negative > positive: return -1
-        else: return 0
+    #     if positive > negative: return 1
+    #     elif negative > positive: return -1
+    #     else: return 0
 
     # Scrap methods
     def start_requests(self):
@@ -140,6 +137,6 @@ class EstadaoSpider(scrapy.Spider):
         item["url"] = response.url
         item["paragraphs"] = paragraphs_str
         item["pubDate"] = self.format_date(time)
-        item["sentiment"] = self.get_index(paragraphs_str)
+        # item["sentiment"] = self.get_index(paragraphs_str)
         
         yield item

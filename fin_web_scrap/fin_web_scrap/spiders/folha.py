@@ -3,11 +3,11 @@ from scrapy.spidermiddlewares.httperror import HttpError
 
 from fin_web_scrap.items import NewsItem
 
-from transformers import (
-    AutoTokenizer,
-    BertForSequenceClassification,
-    pipeline,
-)
+# from transformers import (
+#     AutoTokenizer,
+#     BertForSequenceClassification,
+#     pipeline,
+# )
 
 class FolhaSpider(scrapy.Spider):
     name = "folha"

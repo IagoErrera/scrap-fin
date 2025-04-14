@@ -10,4 +10,4 @@ class NewsItem(scrapy.Item):
     url = scrapy.Field()
     paragraphs = scrapy.Field()
     pubDate = scrapy.Field()
-    sentiment = scrapy.Field()
+    # sentiment = scrapy.Field()
