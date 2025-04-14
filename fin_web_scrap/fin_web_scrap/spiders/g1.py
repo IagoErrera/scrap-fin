@@ -1,29 +1,40 @@
 import math
 import scrapy
 from scrapy.spidermiddlewares.httperror import HttpError
-from scrapy.http import HtmlResponse
 
 from fin_web_scrap.items import NewsItem
 
 from datetime import datetime
 
-# Reestruturar de forma a usar o sitemap para pegar as notícias
-# Fazer a busca das palavras manualmente nas notícias
+from transformers import (
+    AutoTokenizer,
+    BertForSequenceClassification,
+    pipeline,
+)
 
 class G1Spider(scrapy.Spider):
     name = "g1"
     allowed_domains = ["g1.globo.com"]
     start_urls = ["https://g1.globo.com/sitemap/g1/sitemap.xml"]
-    # start_urls = ["https://g1.globo.com/jornal-nacional/noticia/2025/04/11/lula-usa-expressao-machista-para-se-referir-a-presidente-do-fmi-mulherzinha.ghtml"]
-    # start_urls = ["https://g1.globo.com/sitemap/g1/2025/04/12_1.xml"]
     iterator = "iternodes"
     itertag = "item"
 
     search_str = 'fiscal'
-    start_date ='10/04/2025'
-    end_date = '11/04/2025'
+    start_date = '01/01/2010'
+    end_date = '13/04/2025'
     page = 1
     
+    def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
+        super(G1Spider, self).__init__(*args, **kwargs)
+        if start_date: self.start_date = start_date  
+        if end_date: self.end_date = end_date  
+        if search_str: self.search_str = search_str 
+
+        self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
+        self.finbert_pt_br_model = BertForSequenceClassification.from_pretrained("lucas-leme/FinBERT-PT-BR")
+        self.finbert_pt_br_pipeline = pipeline(task='text-classification', model=self.finbert_pt_br_model, tokenizer=self.finbert_pt_br_tokenizer)
+ 
+
     def format_date(self, date_time_str):
         try:
         
@@ -77,6 +88,36 @@ class G1Spider(scrapy.Spider):
             response = failure.value.response
             self.logger.error("HttpError on %s", response.url)
 
+    def get_chuncks(self, text, max_tokens=400, overlap=50):
+        tokens = self.finbert_pt_br_tokenizer.tokenize(text)
+        chunks = []
+
+        start = 0
+        while start < len(tokens):
+            end = start + max_tokens
+            chunk = tokens[start:end]
+            chunks.append(self.finbert_pt_br_tokenizer.convert_tokens_to_string(chunk))
+            start = end - overlap
+
+        return chunks
+
+    def get_index(self, text):
+        chunks = self.get_chuncks(text)
+        
+        pred = self.finbert_pt_br_pipeline(chunks)
+
+        positive = 0
+        negative = 0
+        neutral = 0
+        for p in pred:
+            if p['label'] == "POSITIVE": positive += 1
+            elif p['label'] == "NEGATIVE": negative += 1
+            else: neutral += 1
+        
+        if positive > negative: return 1
+        elif negative > positive: return -1
+        else: return 0
+
     def start_requests(self):
         self.generate_allowed_datas()
         return super().start_requests()
@@ -84,7 +125,7 @@ class G1Spider(scrapy.Spider):
     def parse(self, response):
         if not ('sitemap' in response.url):
             news_item = self.parse_news(response)
-            if news_item: yield news_item 
+            if news_item and news_item is not None: yield news_item 
         else:
             response.selector.register_namespace("ns", "http://www.sitemaps.org/schemas/sitemap/0.9")
             items = response.xpath("//ns:sitemap/ns:loc/text()").getall() if response.url == 'https://g1.globo.com/sitemap/g1/sitemap.xml' else response.xpath("//ns:url/ns:loc/text()").getall()
@@ -92,7 +133,6 @@ class G1Spider(scrapy.Spider):
             for item in items:
                 for date in self.dates_list:
                     if date in item:
-                        print(item)
                         yield scrapy.Request(item, callback=self.parse, errback=self.err_request)
 
     def parse_news(self, response):
@@ -100,20 +140,28 @@ class G1Spider(scrapy.Spider):
             if 'ghtml' in response.url:
                 paragraphs = response.css('p.content-text__container::text, blockquote.content-blockquote::text').getall()
                 time = response.css('time::attr(datetime)').get()
-            else:
+            elif 'html' in response.url:
                 paragraphs = response.css('div.materia-conteudo p::text').getall()
                 time = response.css('abbr.published::attr(datetime)').get()
 
+                if not paragraphs:
+                    paragraphs = response.css('section.post-content p::text').getall()
+            else:
+                paragraphs = response.css('div.entry p::text').getall()
+                time = response.css('div.time small:text').get()
+                time = time.split(', ')[1]
+
             paragraphs_str = ''.join(paragraphs) if paragraphs else ''
 
-            if not (self.search_str in paragraphs_str): return None
+            if not (self.search_str in paragraphs_str): return
 
             item = NewsItem()
             item["url"] = response.url
             item["paragraphs"] = paragraphs_str
             item["pubDate"] = time
+            item["sentiment"] = self.get_index(paragraphs_str)
 
             return item
         except:
-            return None
+            return
     
