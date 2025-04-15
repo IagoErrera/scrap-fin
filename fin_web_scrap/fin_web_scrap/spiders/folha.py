@@ -20,8 +20,10 @@ class FolhaSpider(scrapy.Spider):
 
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
         super(FolhaSpider, self).__init__(*args, **kwargs)
-        self.start_date = start_date  
-        self.end_date = end_date  
+        # self.start_date = start_date  
+        # self.end_date = end_date  
+        self.start_date = self.format_date(start_date)  
+        self.end_date = self.format_date(end_date)  
         self.search_str = search_str
 
         # self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
@@ -35,6 +37,7 @@ class FolhaSpider(scrapy.Spider):
         start_date = self.format_date(self.start_date)
         end_date = self.format_date(self.end_date)
         return f'https://search.folha.uol.com.br/search?q={self.search_str}&periodo=personalizado&sd={start_date}&ed={end_date}&site=todos'
+        # return f'https://search.folha.uol.com.br/search?q=fiscal&site=todos&periodo=personalizado&sr={self.counter}' 
 
     def get_chuncks(self, text, max_tokens=400, overlap=50):
         tokens = self.finbert_pt_br_tokenizer.tokenize(text)

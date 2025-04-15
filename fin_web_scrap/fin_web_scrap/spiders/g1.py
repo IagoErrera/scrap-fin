@@ -138,7 +138,7 @@ class G1Spider(scrapy.Spider):
                 time = response.css('time::attr(datetime)').get()
             elif 'html' in response.url:
                 paragraphs = response.css('div.materia-conteudo p::text').getall()
-                time = response.css('abbr.published::attr(datetime)').get()
+                time = response.css('abbr.published::text').get()
 
                 if not paragraphs:
                     paragraphs = response.css('section.post-content p::text').getall()
