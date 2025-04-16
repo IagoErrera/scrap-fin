@@ -14,7 +14,7 @@ finbert_pt_br_pipeline = pipeline(task='text-classification', model=finbert_pt_b
 
 def get_index(text):
     chunks = get_chuncks(text)
-    
+
     pred = finbert_pt_br_pipeline(chunks)
 
     positive = 0
@@ -24,7 +24,7 @@ def get_index(text):
         if p['label'] == "POSITIVE": positive += 1
         elif p['label'] == "NEGATIVE": negative += 1
         else: neutral += 1
-    
+
     if positive > negative: return 1
     elif negative > positive: return -1
     else: return 0
@@ -42,14 +42,18 @@ def get_chuncks(text, max_tokens=400, overlap=50):
 
     return chunks
 
-path = sys.argv[1]
+# Coloque os arquivos aqui
+files = ['folha_2018-2020.csv', 'g1_2017_2023.csv', 'estadao_2017-2022.csv']
 
-data = pd.read_csv(path)
-# data = pd.read_csv('./fin_web_scrap//folha_p.csv')
+for i, path in enumerate(files):
+  if i == 0: data = pd.read_csv(path)
+  else: data = pd.concat([data, pd.read_csv(path)])
 
 data = data.dropna()
+data = data.drop(data[data['pubDate'] == "#"].index)
 
-data['pubDate'] = pd.to_datetime(data['pubDate']) 
+data['pubDate'] = data['pubDate'].apply(lambda s: s if not 'T' in s else s.split('T')[0])
+data['pubDate'] = pd.to_datetime(data['pubDate'], format='%Y-%m-%d')
 data['sentiment'] = data['paragraphs'].apply(get_index)
 
 group_month_year = data.groupby([data['pubDate'].dt.month, data['pubDate'].dt.year])
@@ -57,22 +61,24 @@ dates_pair = group_month_year.groups.keys()
 
 index_array = []
 time_array = []
+count_array = []
 for date in dates_pair:
     group_data = group_month_year.get_group(date)
     index = group_data['sentiment'].sum() / group_data['sentiment'].count()
     index_array.append(index)
-    
-    time_str = f"{date[0] if date[0] > 9 else "0"+str(date[0])}-{date[1]}"
-    time_array.append(time_str) 
 
-plt.figure(figsize=(14, 7))
-plt.plot(time_array, index_array)
-plt.show()
+    count_array.append(group_data['sentiment'].count())
+
+    time_str = f"{date[0] if date[0] > 9 else '0'+str(date[0])}-{date[1]}"
+    time_array.append(time_str)
 
 export_date = {
     "time": time_array,
-    "sentiment_index": index_array
+    "sentiment_index": index_array,
+    "count": count_array
 }
 
 export_df = pd.DataFrame(export_date)
+export_df['time'] = pd.to_datetime(export_df['time'], format='%m-%Y')
+export_df = export_df.sort_values(by='time').reset_index(drop=True)
 export_df.to_csv('out.csv', index=False)

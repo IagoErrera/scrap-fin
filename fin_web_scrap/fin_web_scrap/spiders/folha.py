@@ -154,6 +154,8 @@ class FolhaSpider(scrapy.Spider):
 
             if paragraphs_str == "": print("Error: ", response.url)
             if not self.search_str in paragraphs_str: return 
+            if time == "#": return
+            if time and 'T' in time: time = time.split('T')[0]
 
             item = NewsItem()
             item["url"] = response.url

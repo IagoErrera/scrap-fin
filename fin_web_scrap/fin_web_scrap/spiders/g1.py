@@ -105,37 +105,29 @@ class G1Spider(scrapy.Spider):
                 paragraphs = response.css('p.content-text__container::text, blockquote.content-blockquote::text').getall()
                 time = response.css('time::attr(datetime)').get()
             elif 'html' in response.url:
-                # print('1')
                 paragraphs = response.css('div.materia-conteudo p::text').getall()
-                # print('2')
                 time = response.css('meta[property="article:published_time"]::attr(content)').get()
-                # print('3')
                 if (not time) or (time == 'g1'):
                     time = response.css('time.post-date::attr(datetime)').get()
-                # print('3.1')
 
                 if not paragraphs:
                     paragraphs = response.css('section.post-content p::text').getall()
                 
-                # print('4')
             else:
                 paragraphs = response.css('div.entry p::text').getall()
                 time = response.css('div.time small:text').get()
                 if time:
                     time = time.split(', ')[1]
 
-            # print('5')
-            # print('p: ', paragraphs)
-            # print('t: ', time)
             paragraphs_str = ''.join(paragraphs) if paragraphs else ''
-            # print('6')
 
             if not (self.search_str in paragraphs_str): return
-            # print('7')
+            if time == "#": return
+            if time and 'T' in time: time = time.split('T')[0]
 
             item = NewsItem()
             item["url"] = response.url
-            item["paragraphs"] = paragraphs_str
+            item["paragraphs"] = paragraphs_str.replace('\n', '').replace('\r', '')
             item["pubDate"] = time
 
             return item

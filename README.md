@@ -34,3 +34,15 @@ scrapy crawl folha -a start_date=01/01/2025 -a end_date=10/01/2025 -a search_str
 - xml 
 - marshal
 - pickle
+
+# Geração do índice
+
+Definir os arquivos de input 
+
+```
+files = [<caminho do arquivo csv 1>, <caminho do arquivo csv 2>, ...]
+```
+
+```
+python data_analysis/create_index.py
+```
