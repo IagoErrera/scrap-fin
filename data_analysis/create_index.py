@@ -1,6 +1,4 @@
-import sys
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from transformers import (
     AutoTokenizer,
@@ -43,7 +41,7 @@ def get_chuncks(text, max_tokens=400, overlap=50):
     return chunks
 
 # Coloque os arquivos aqui
-files = ['folha_2018-2020.csv', 'g1_2017_2023.csv', 'estadao_2017-2022.csv']
+files = ['data_analysis/folha_2018-2020.csv', 'data_analysis/g1_2017_2023.csv', 'data_analysis/estadao_2017-2022.csv']
 
 for i, path in enumerate(files):
   if i == 0: data = pd.read_csv(path)
@@ -62,6 +60,9 @@ dates_pair = group_month_year.groups.keys()
 index_array = []
 time_array = []
 count_array = []
+count_positive_array = []
+count_negative_array = []
+count_neutral_array = []
 for date in dates_pair:
     group_data = group_month_year.get_group(date)
     index = group_data['sentiment'].sum() / group_data['sentiment'].count()
@@ -69,13 +70,23 @@ for date in dates_pair:
 
     count_array.append(group_data['sentiment'].count())
 
+    positive_count = (group_data['sentiment'] == 1).sum()
+    negative_count = (group_data['sentiment'] == -1).sum()
+    neutral_count = (group_data['sentiment'] == 0).sum()
+    count_positive_array.append(positive_count)
+    count_negative_array.append(negative_count)
+    count_neutral_array.append(neutral_count)
+
     time_str = f"{date[0] if date[0] > 9 else '0'+str(date[0])}-{date[1]}"
     time_array.append(time_str)
 
 export_date = {
     "time": time_array,
     "sentiment_index": index_array,
-    "count": count_array
+    "count": count_array,
+    "positive_count": count_positive_array,
+    "negative_count": count_negative_array,
+    "neutral_count": count_neutral_array,
 }
 
 export_df = pd.DataFrame(export_date)

@@ -1,3 +1,10 @@
+# Bibliotecas usadas 
+
+- [scrapy (webscraping)](https://anaconda.org/conda-forge/scrapy)
+- [transformers (Hugginface)](https://huggingface.co/docs/transformers/installation#conda)
+
+> Recomendo uso do Anaconda ou [Minicoda](https://www.anaconda.com/docs/getting-started/miniconda/install)
+
 # Como rodas as Spiders
 
 Entre no diretório `fin_web_scrap`
@@ -38,6 +45,8 @@ scrapy crawl folha -a start_date=01/01/2025 -a end_date=10/01/2025 -a search_str
 # Geração do índice
 
 Definir os arquivos de input 
+
+> O caminho do arquivo deve ser relativo ao diretório em que o usuário está executando o script
 
 ```
 files = [<caminho do arquivo csv 1>, <caminho do arquivo csv 2>, ...]
