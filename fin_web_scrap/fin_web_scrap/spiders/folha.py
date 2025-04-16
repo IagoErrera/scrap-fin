@@ -1,75 +1,68 @@
+import re
 import scrapy
 from scrapy.spidermiddlewares.httperror import HttpError
 
 from fin_web_scrap.items import NewsItem
 
-# from transformers import (
-#     AutoTokenizer,
-#     BertForSequenceClassification,
-#     pipeline,
-# )
+from datetime import datetime
 
 class FolhaSpider(scrapy.Spider):
     name = "folha"
-    # allowed_domains = ["search.folha.uol.com.br"]
 
-    # search_str = 'fiscal'
-    # start_date = '01/01/2010'
-    # end_date = '13/04/2025'
     page = 1
+    month_list = {
+        'janeiro': 1,
+        'fevereiro': 2,
+        'março': 3,
+        'abril': 4,
+        'maio': 5,
+        'junho': 6,
+        'julho': 7,
+        'agosto': 8,
+        'setembro': 9,
+        'outubro': 10,
+        'novembro': 11,
+        'dezembro': 12,
+        'jan': 1,
+        'fev': 2,
+        'mar': 3,
+        'abr': 4,
+        'maio': 5,
+        'jun': 6,
+        'jul': 7,
+        'ago': 8,
+        'set': 9,
+        'out': 10,
+        'nov': 11,
+        'dez': 12
+    }
 
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
         super(FolhaSpider, self).__init__(*args, **kwargs)
-        # self.start_date = start_date  
-        # self.end_date = end_date  
         self.start_date = self.format_date(start_date)  
         self.end_date = self.format_date(end_date)  
         self.search_str = search_str
 
-        # self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        # self.finbert_pt_br_model = BertForSequenceClassification.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        # self.finbert_pt_br_pipeline = pipeline(task='text-classification', model=self.finbert_pt_br_model, tokenizer=self.finbert_pt_br_tokenizer)
-
     def format_date(self, date_str):
         return date_str.replace("/", "%2F") 
 
+    def parse_date(self, date_str):
+        try:
+            date = date_str.split(' às ')[0]
+            date = date.split('.')
+            month_n = self.month_list.get(date[1].lower())
+            return datetime(day=int(date[0]), month=month_n, year=int(date[2])).date().isoformat()
+        except:
+            return
+    
     def generate_url(self):
         start_date = self.format_date(self.start_date)
         end_date = self.format_date(self.end_date)
         return f'https://search.folha.uol.com.br/search?q={self.search_str}&periodo=personalizado&sd={start_date}&ed={end_date}&site=todos'
-        # return f'https://search.folha.uol.com.br/search?q=fiscal&site=todos&periodo=personalizado&sr={self.counter}' 
-
-    def get_chuncks(self, text, max_tokens=400, overlap=50):
-        tokens = self.finbert_pt_br_tokenizer.tokenize(text)
-        chunks = []
-
-        start = 0
-        while start < len(tokens):
-            end = start + max_tokens
-            chunk = tokens[start:end]
-            chunks.append(self.finbert_pt_br_tokenizer.convert_tokens_to_string(chunk))
-            start = end - overlap
-
-        return chunks
-
-    def get_index(self, text):
-        chunks = self.get_chuncks(text)
-        
-        pred = self.finbert_pt_br_pipeline(chunks)
-
-        positive = 0
-        negative = 0
-        neutral = 0
-        for p in pred:
-            if p['label'] == "POSITIVE": positive += 1
-            elif p['label'] == "NEGATIVE": negative += 1
-            else: neutral += 1
-        
-        if positive > negative: return 1
-        elif negative > positive: return -1
-        else: return 0
 
     def err_request(self, failure):
+        print("Error on Request")
+        
         self.logger.error(repr(failure))
 
         if failure.check(HttpError):
@@ -78,7 +71,7 @@ class FolhaSpider(scrapy.Spider):
 
     def start_requests(self):
         yield scrapy.Request(self.generate_url(), callback=self.parse_search, errback=self.err_request)
-
+        
     def parse_search(self, response):
         links = response.css('div.c-headline__content a::attr(href)').getall()
         page_navigator = response.css('li.c-pagination__arrow a::attr(href)').getall()
@@ -89,24 +82,84 @@ class FolhaSpider(scrapy.Spider):
         if page_navigator:
             if self.page == 1:
                 self.page += 1
-                print("\r\n\r\n")
-                print(f"Next Page: {self.page}")
-                print(f"Next Page Link: {page_navigator[0]}")
-                print("\r\n\r\n")
                 yield scrapy.Request(page_navigator[0], callback=self.parse_search, errback=self.err_request)
             elif len(page_navigator) == 2:
                 yield scrapy.Request(page_navigator[1], callback=self.parse_search, errback=self.err_request)
 
     def parse_news(self, response):
-        paragraphs = response.css('div.c-news__body > p::text').getall()
-        time = response.css('time::attr(datetime)').get()
+        try:
+            paragraphs = response.css('div.contentContainer p::text').getall()
+            time = response.css('meta[name=date]::attr(content)').get()
+            if time:
+                time = time.split(' ')[1]
+                split_time = time.split('/')
+                time = f"{split_time[2]}-{split_time[1]}-{split_time[0]}"
+            if not paragraphs or not time:
+                paragraphs = response.css('article.news div.news__content p::text').getall()
+                time = response.css('time::attr(datetime)').get()
+            if not paragraphs or not time:
+                paragraphs = response.css('div[id=articleNew] p::text').getall()
+                time = response.css('meta[name=date]::attr(content)').get()
+                if time:
+                    s_time = time.split(' ')
+                    time = s_time[1] if len(s_time) > 1 else time
+                    split_time = time.split('/')
+                    time = f"{split_time[2]}-{split_time[1]}-{split_time[0]}"
+                if not paragraphs or not time:
+                    paragraphs = response.css('div.c-news__content p::text').getall()
+                    time = response.css('time::attr(datetime)').get()
+                    if time:
+                        time = time.split(' ')[0] 
+                if not paragraphs or not time:
+                    paragraphs = response.css('article.news div.news__content p::text, article.c-news div.c-news__content p::text').getall()
+                    time = response.css('time::text').get()
+                    if not time: time = response.css('time::attr(datetime)').get()
+                    if time: 
+                        p_time = self.parse_date(time)
+                        if not p_time:
+                            time = time.split(' ')[0]
+                        else:
+                            time = p_time 
+                if not paragraphs or not time:
+                    paragraphs = response.xpath('//td/text()').getall()
+                    time = response.css('meta[name=date]::attr(content)').get()
+                    if time:
+                        time = time.split(' ')[1]
+                        split_time = time.split('/')
+                        time = f"{split_time[2]}-{split_time[1]}-{split_time[0]}"
+                if not paragraphs or not time:
+                    paragraphs = response.css('article.news div.content p::text').getall()
+                    time = response.css('time::attr(datetime)').getall()
+                    if time:
+                        time = time[len(time)-1]
+                        time = time.split(' ')[0]
+                if not paragraphs or not time:
+                    paragraphs = response.css('div.content p::text').getall()
+                    time = response.css('time::attr(datetime)').getall()
+                    if time:
+                        time = time[len(time)-1]
+                        time = time.split(' ')[0]
+                if not paragraphs or not time:
+                    script = response.xpath('//script[contains(., "location.replace")]/text()').get()
+                    if script:
+                        redirect = re.search(r'location\.replace\(\s*"([^"]+)"\s*\)', script).group(1)
 
-        paragraphs_str = ''.join(paragraphs)
+                        yield scrapy.Request(redirect, callback=self.parse_news, errback=self.err_request)
+                        return
+            if not paragraphs or not time:
+                paragraphs = response.css('div.c-news__body > p::text').getall()
+                time = response.css('time::attr(datetime)').get()
 
-        item = NewsItem()
-        item["url"] = response.url
-        item["paragraphs"] = paragraphs_str 
-        item["pubDate"] = time
-        # item["sentiment"] = self.get_index(paragraphs_str)
+            paragraphs_str = ''.join(paragraphs)
 
-        yield item
+            if paragraphs_str == "": print("Error: ", response.url)
+            if not self.search_str in paragraphs_str: return 
+
+            item = NewsItem()
+            item["url"] = response.url
+            item["paragraphs"] = paragraphs_str.replace('\n', '').replace('\r', '') 
+            item["pubDate"] = time
+
+            yield item
+        except:
+            print("ERROR: ", response.url)

@@ -6,12 +6,6 @@ from fin_web_scrap.items import NewsItem
 
 from datetime import datetime
 
-# from transformers import (
-#     AutoTokenizer,
-#     BertForSequenceClassification,
-#     pipeline,
-# )
-
 class G1Spider(scrapy.Spider):
     name = "g1"
     allowed_domains = ["g1.globo.com"]
@@ -20,29 +14,24 @@ class G1Spider(scrapy.Spider):
     itertag = "item"
 
     page = 1
-    
+
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
         super(G1Spider, self).__init__(*args, **kwargs)
         self.start_date = start_date  
         self.end_date = end_date  
         self.search_str = search_str 
 
-        # self.finbert_pt_br_tokenizer = AutoTokenizer.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        # self.finbert_pt_br_model = BertForSequenceClassification.from_pretrained("lucas-leme/FinBERT-PT-BR")
-        # self.finbert_pt_br_pipeline = pipeline(task='text-classification', model=self.finbert_pt_br_model, tokenizer=self.finbert_pt_br_tokenizer)
-
     def format_date(self, date_time_str):
         try:
-        
-            data_str, hora_str = date_time_str.split(" | ") if " | " in date_time_str else date_time_str, None
+            date, hour_str = date_time_str.split(" | ") if " | " in date_time_str else date_time_str, None
             
-            dia, mes, ano = map(int, data_str.split("/"))
+            day, month, year = map(int, date.split("/"))
             
-            hora, minuto = map(int, hora_str.replace("h", ":").split(":")) if hora_str else 0, 0
+            hour, minute = map(int, hour_str.replace("h", ":").split(":")) if hour_str else 0, 0
             
-            data_hora = datetime(ano, mes, dia, hora, minuto)
+            date_hour = datetime(year, month, day, hour, minute)
             
-            return data_hora.isoformat()
+            return date_hour.isoformat()
         except:
             return math.nan
 
@@ -78,58 +67,37 @@ class G1Spider(scrapy.Spider):
         self.dates_list.append(date)
 
     def err_request(self, failure):
+        print("Error on Request")
+
         self.logger.error(repr(failure))
 
         if failure.check(HttpError):
             response = failure.value.response
             self.logger.error("HttpError on %s", response.url)
 
-    # def get_chuncks(self, text, max_tokens=400, overlap=50):
-    #     tokens = self.finbert_pt_br_tokenizer.tokenize(text)
-    #     chunks = []
-
-    #     start = 0
-    #     while start < len(tokens):
-    #         end = start + max_tokens
-    #         chunk = tokens[start:end]
-    #         chunks.append(self.finbert_pt_br_tokenizer.convert_tokens_to_string(chunk))
-    #         start = end - overlap
-
-    #     return chunks
-
-    # def get_index(self, text):
-    #     chunks = self.get_chuncks(text)
-        
-    #     pred = self.finbert_pt_br_pipeline(chunks)
-
-    #     positive = 0
-    #     negative = 0
-    #     neutral = 0
-    #     for p in pred:
-    #         if p['label'] == "POSITIVE": positive += 1
-    #         elif p['label'] == "NEGATIVE": negative += 1
-    #         else: neutral += 1
-        
-    #     if positive > negative: return 1
-    #     elif negative > positive: return -1
-    #     else: return 0
-
     def start_requests(self):
         self.generate_allowed_datas()
         return super().start_requests()
 
     def parse(self, response):
-        if not ('sitemap' in response.url):
-            news_item = self.parse_news(response)
-            if news_item and news_item is not None: yield news_item 
-        else:
-            response.selector.register_namespace("ns", "http://www.sitemaps.org/schemas/sitemap/0.9")
-            items = response.xpath("//ns:sitemap/ns:loc/text()").getall() if response.url == 'https://g1.globo.com/sitemap/g1/sitemap.xml' else response.xpath("//ns:url/ns:loc/text()").getall()
+        try:
+            if not ('sitemap' in response.url):
+                news_item = self.parse_news(response)
+                if news_item and news_item is not None: yield news_item 
+            else:
+                response.selector.register_namonthpace("ns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+                items = response.xpath("//ns:sitemap/ns:loc/text()").getall() if response.url == 'https://g1.globo.com/sitemap/g1/sitemap.xml' else response.xpath("//ns:url/ns:loc/text()").getall()
 
-            for item in items:
-                for date in self.dates_list:
-                    if date in item:
-                        yield scrapy.Request(item, callback=self.parse, errback=self.err_request)
+                if response.url == "https://g1.globo.com/sitemap/g1/sitemap.xml":
+                    for item in items:
+                        for date in self.dates_list:
+                            if date in item:
+                                yield scrapy.Request(item, callback=self.parse, errback=self.err_request)
+                else:
+                    for item in items:
+                        yield scrapy.Request(item, callback=self.parse_news, errback=self.err_request)
+        except:
+            print("PARSE ERROR: ", response.url)
 
     def parse_news(self, response):
         try:
@@ -137,27 +105,41 @@ class G1Spider(scrapy.Spider):
                 paragraphs = response.css('p.content-text__container::text, blockquote.content-blockquote::text').getall()
                 time = response.css('time::attr(datetime)').get()
             elif 'html' in response.url:
+                # print('1')
                 paragraphs = response.css('div.materia-conteudo p::text').getall()
-                time = response.css('abbr.published::text').get()
+                # print('2')
+                time = response.css('meta[property="article:published_time"]::attr(content)').get()
+                # print('3')
+                if (not time) or (time == 'g1'):
+                    time = response.css('time.post-date::attr(datetime)').get()
+                # print('3.1')
 
                 if not paragraphs:
                     paragraphs = response.css('section.post-content p::text').getall()
+                
+                # print('4')
             else:
                 paragraphs = response.css('div.entry p::text').getall()
                 time = response.css('div.time small:text').get()
-                time = time.split(', ')[1]
+                if time:
+                    time = time.split(', ')[1]
 
+            # print('5')
+            # print('p: ', paragraphs)
+            # print('t: ', time)
             paragraphs_str = ''.join(paragraphs) if paragraphs else ''
+            # print('6')
 
             if not (self.search_str in paragraphs_str): return
+            # print('7')
 
             item = NewsItem()
             item["url"] = response.url
             item["paragraphs"] = paragraphs_str
             item["pubDate"] = time
-            # item["sentiment"] = self.get_index(paragraphs_str)
 
             return item
         except:
+            print("PARSE NEWS ERROR: ", response.url)
             return
     
