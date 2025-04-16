@@ -85,7 +85,7 @@ class G1Spider(scrapy.Spider):
                 news_item = self.parse_news(response)
                 if news_item and news_item is not None: yield news_item 
             else:
-                response.selector.register_namonthpace("ns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+                response.selector.register_namespace("ns", "http://www.sitemaps.org/schemas/sitemap/0.9")
                 items = response.xpath("//ns:sitemap/ns:loc/text()").getall() if response.url == 'https://g1.globo.com/sitemap/g1/sitemap.xml' else response.xpath("//ns:url/ns:loc/text()").getall()
 
                 if response.url == "https://g1.globo.com/sitemap/g1/sitemap.xml":
