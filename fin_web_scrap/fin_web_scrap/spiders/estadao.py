@@ -20,10 +20,8 @@ class EstadaoSpider(scrapy.Spider):
 
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
         super(EstadaoSpider, self).__init__(*args, **kwargs)
-        # if start_date: self.start_date = start_date  
-        # if end_date: self.end_date = end_date  
-        if start_date: self.start_date = '01/04/2025'  
-        if end_date: self.end_date = '02/04/2025'
+        if start_date: self.start_date = start_date  
+        if end_date: self.end_date = end_date  
         if search_str: self.search_str = search_str  
 
     # Auxiliar methods
