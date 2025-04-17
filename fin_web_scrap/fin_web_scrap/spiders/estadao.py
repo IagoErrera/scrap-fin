@@ -20,8 +20,10 @@ class EstadaoSpider(scrapy.Spider):
 
     def __init__(self, start_date=None, end_date=None, search_str=None, start_url=None, *args, **kwargs):
         super(EstadaoSpider, self).__init__(*args, **kwargs)
-        if start_date: self.start_date = start_date  
-        if end_date: self.end_date = end_date  
+        # if start_date: self.start_date = start_date  
+        # if end_date: self.end_date = end_date  
+        if start_date: self.start_date = '01/04/2025'  
+        if end_date: self.end_date = '02/04/2025'
         if search_str: self.search_str = search_str  
 
     # Auxiliar methods
@@ -43,7 +45,7 @@ class EstadaoSpider(scrapy.Spider):
             return math.nan
 
     def generate_api_url(self):
-        params = {
+        inner_params = {
             "mode": "api",
             "size": self.size,
             "from": self.off,
@@ -51,12 +53,28 @@ class EstadaoSpider(scrapy.Spider):
             "search_text": self.search_str,
             "date_range": f"{self.start_date},{self.end_date}"
         }
-        query = {
-            "params": json.dumps(params),
+        inner_params_str = json.dumps(inner_params, separators=(",", ":"))
+
+        outer_query = {
+            "params": inner_params_str,
             "requestUri": "/busca"
         }
-        query_encoded = quote(json.dumps(query))
-        return f"https://www.estadao.com.br/pf/api/v3/content/fetch/search-story?query={query_encoded}&d=1768&_website=estadao"
+
+        query_str = json.dumps(outer_query, separators=(",", ":"))
+
+        url_params = {
+            "query": query_str,
+            "d": 1776,
+            "_website": "estadao"
+        }
+
+
+        encoded_params = urlencode(url_params, quote_via=quote)
+
+        base_url = "https://www.estadao.com.br/pf/api/v3/content/fetch/search-story"
+        url = f"{base_url}?{encoded_params}"
+
+        return url
     
     def err_request(self, failure):
         print("ERROR ON REQUEST")
